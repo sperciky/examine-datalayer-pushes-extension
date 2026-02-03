@@ -293,7 +293,7 @@ console.log('[DevTools Panel] Script starting to load...');
     const highlightClass = isHighlight ? 'stack-highlight' : '';
     const title = isExtensionFrame
       ? 'Browser extension frame'
-      : `Click to open at Line ${parsed?.line}:${parsed?.column}\nTip: Use Ctrl/Cmd+P in Sources, then :${parsed?.line}:${parsed?.column}`;
+      : `Click to open in Sources at line ${parsed?.line}, column ${parsed?.column}`;
 
     if (parsed && !isExtensionFrame) {
       // Create a clickable line
@@ -317,32 +317,20 @@ console.log('[DevTools Panel] Script starting to load...');
         e.stopPropagation();
 
         try {
-          // Create a clickable link in the console that navigates to exact position
-          // by creating a fake error with the exact location in the stack trace
-          const escapedUrl = parsed.url.replace(/'/g, "\\'");
-          const evalCode = `
-            (function() {
-              const fakeError = new Error('📍 Click the line below to navigate to exact position:');
-              // Construct a stack trace with the exact position
-              fakeError.stack = 'Click here to navigate:\\n    at (${escapedUrl}:${parsed.line}:${parsed.column})';
-              console.log('%c[DataLayer Debugger] Navigation Helper', 'color: #1976d2; font-weight: bold; font-size: 12px;');
-              console.log(fakeError);
-            })();
-          `;
-
-          // Evaluate in the inspected window to create a clickable console link
-          chrome.devtools.inspectedWindow.eval(evalCode, (result, exceptionInfo) => {
-            if (exceptionInfo) {
-              console.warn('[DevTools Panel] Could not create clickable link:', exceptionInfo);
+          // Open the resource in Sources panel at exact line AND column
+          // Both lineNumber and columnNumber are 0-based, so subtract 1
+          chrome.devtools.panels.openResource(
+            parsed.url,
+            parsed.line - 1,
+            parsed.column - 1,
+            () => {
+              if (chrome.runtime.lastError) {
+                console.warn('[DevTools Panel] Could not open resource:', chrome.runtime.lastError.message);
+              } else {
+                console.log(`[DevTools Panel] Opened ${parsed.url} at line ${parsed.line}, column ${parsed.column}`);
+              }
             }
-          });
-
-          // Also try to open the resource at the line (best effort)
-          chrome.devtools.panels.openResource(parsed.url, parsed.line - 1, () => {
-            if (chrome.runtime.lastError) {
-              console.warn('[DevTools Panel] Could not open resource:', chrome.runtime.lastError.message);
-            }
-          });
+          );
         } catch (error) {
           console.error('[DevTools Panel] Error opening resource:', error);
         }
