@@ -331,6 +331,7 @@
    */
   function clearLogs() {
     logs = [];
+    currentUrl = ''; // Reset URL tracking for fresh start
     render();
   }
 
