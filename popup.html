@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataLayer Debugger</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      width: 320px;
+      padding: 16px;
+      background: #f8f9fa;
+    }
+
+    .header {
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a73e8;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      font-size: 13px;
+      color: #333;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: 'Courier New', monospace;
+      background: white;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+    }
+
+    .help-text {
+      font-size: 11px;
+      color: #666;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .current-value {
+      background: #e8f0fe;
+      padding: 8px 10px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #1967d2;
+      margin-bottom: 12px;
+      word-break: break-all;
+    }
+
+    .current-label {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    button {
+      width: 100%;
+      padding: 9px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button.primary {
+      background: #1a73e8;
+      color: white;
+      margin-bottom: 8px;
+    }
+
+    button.primary:hover {
+      background: #1557b0;
+    }
+
+    button.primary:active {
+      background: #0d47a1;
+    }
+
+    button.secondary {
+      background: white;
+      color: #666;
+      border: 1px solid #ddd;
+    }
+
+    button.secondary:hover {
+      background: #f8f9fa;
+      border-color: #bbb;
+    }
+
+    .status-message {
+      padding: 8px 10px;
+      border-radius: 4px;
+      margin-top: 12px;
+      font-size: 12px;
+      display: none;
+      text-align: center;
+    }
+
+    .status-message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      display: block;
+    }
+
+    .status-message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+
+    .divider {
+      height: 1px;
+      background: #e0e0e0;
+      margin: 16px 0;
+    }
+
+    .link-button {
+      background: none;
+      border: none;
+      color: #1a73e8;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 6px;
+      text-decoration: underline;
+    }
+
+    .link-button:hover {
+      color: #1557b0;
+    }
+
+    .info-box {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 4px;
+      padding: 10px;
+      margin-top: 12px;
+      font-size: 11px;
+      color: #856404;
+      line-height: 1.4;
+    }
+
+    .info-box strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>DataLayer Debugger</h1>
+    <p class="subtitle">Configure observed object</p>
+  </div>
+
+  <div class="current-label">Currently observing:</div>
+  <div class="current-value" id="currentValue">Loading...</div>
+
+  <form id="configForm">
+    <div class="form-group">
+      <label for="observedObject">Object Name</label>
+      <input
+        type="text"
+        id="observedObject"
+        name="observedObject"
+        placeholder="dataLayer"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <p class="help-text">
+        Enter the global object name (without <code>window.</code>)
+      </p>
+    </div>
+
+    <button type="submit" class="primary">Save & Reload Page</button>
+    <button type="button" id="openOptionsButton" class="secondary">Advanced Options</button>
+  </form>
+
+  <div id="statusMessage" class="status-message"></div>
+
+  <div class="divider"></div>
+
+  <div style="text-align: center;">
+    <button class="link-button" id="openDevToolsButton">Open DevTools Panel →</button>
+  </div>
+
+  <div class="info-box">
+    <strong>How to view events:</strong>
+    Open DevTools (F12) and go to the "DataLayer" tab to see intercepted pushes with full stack traces.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
