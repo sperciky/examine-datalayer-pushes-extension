@@ -107,9 +107,11 @@
         event.data.type === 'DATALAYER_PRE_HOOK_SNAPSHOT' ||
         event.data.type === 'DATALAYER_DEBUGGER_INITIALIZED'
       )) {
+        console.log('[Content Script] Received message from page:', event.data.type);
+
         // Check if extension context is still valid before attempting to send message
         if (!isExtensionContextValid()) {
-          // Extension was reloaded or disabled - stop trying to send messages
+          console.warn('[Content Script] Extension context invalid, cannot send message');
           return;
         }
 
@@ -117,24 +119,31 @@
         try {
           // Double-check that sendMessage exists
           if (!chrome.runtime.sendMessage) {
+            console.error('[Content Script] chrome.runtime.sendMessage not available');
             return;
           }
 
-          const promise = chrome.runtime.sendMessage({
+          const messageToSend = {
             type: event.data.type,
             data: event.data.data,
             url: window.location.href,
             frameId: window === window.top ? 0 : -1 // Simple frame detection
-          });
+          };
+
+          console.log('[Content Script] Sending to background:', messageToSend.type, 'for URL:', messageToSend.url);
+
+          const promise = chrome.runtime.sendMessage(messageToSend);
 
           // Only attach .catch() if promise was returned
           if (promise && typeof promise.catch === 'function') {
-            promise.catch(() => {
-              // Silently ignore errors (e.g., when DevTools is not open or context invalidated)
+            promise.then(() => {
+              console.log('[Content Script] Message sent successfully:', messageToSend.type);
+            }).catch((error) => {
+              console.warn('[Content Script] Failed to send message:', error);
             });
           }
         } catch (e) {
-          // Extension context invalidated during send - ignore silently
+          console.error('[Content Script] Exception while sending message:', e);
         }
       }
     });
