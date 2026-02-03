@@ -3,16 +3,32 @@
  * Displays intercepted push events in the DevTools panel
  */
 
+console.log('[DevTools Panel] Script starting to load...');
+
 (function() {
   'use strict';
 
+  console.log('[DevTools Panel] IIFE started');
+
+  try {
+
   // UI Elements
+  console.log('[DevTools Panel] Getting UI elements...');
   const content = document.getElementById('content');
   const emptyState = document.getElementById('emptyState');
   const clearButton = document.getElementById('clearButton');
   const filterInput = document.getElementById('filterInput');
   const logCount = document.getElementById('logCount');
   const persistCheckbox = document.getElementById('persistCheckbox');
+
+  console.log('[DevTools Panel] UI elements:', {
+    content: !!content,
+    emptyState: !!emptyState,
+    clearButton: !!clearButton,
+    filterInput: !!filterInput,
+    logCount: !!logCount,
+    persistCheckbox: !!persistCheckbox
+  });
 
   // State
   let logs = [];
@@ -443,26 +459,62 @@
   }
 
   // Event listeners
-  clearButton.addEventListener('click', clearLogs);
-  filterInput.addEventListener('input', handleFilter);
-  persistCheckbox.addEventListener('change', handlePersistChange);
+  console.log('[DevTools Panel] Attaching event listeners...');
+
+  if (clearButton) {
+    clearButton.addEventListener('click', clearLogs);
+    console.log('[DevTools Panel] Clear button listener attached');
+  } else {
+    console.error('[DevTools Panel] clearButton not found!');
+  }
+
+  if (filterInput) {
+    filterInput.addEventListener('input', handleFilter);
+    console.log('[DevTools Panel] Filter input listener attached');
+  } else {
+    console.error('[DevTools Panel] filterInput not found!');
+  }
+
+  if (persistCheckbox) {
+    persistCheckbox.addEventListener('change', handlePersistChange);
+    console.log('[DevTools Panel] Persist checkbox listener attached');
+  } else {
+    console.error('[DevTools Panel] persistCheckbox not found!');
+  }
 
   // Initialize
   async function initialize() {
+    console.log('[DevTools Panel] initialize() called');
+
     // Load persist preference
+    console.log('[DevTools Panel] Loading persist preference...');
     await loadPersistPreference();
 
     // Setup message listeners
+    console.log('[DevTools Panel] Setting up message listeners...');
     try {
       setupMessageListener();
+      console.log('[DevTools Panel] setupMessageListener() succeeded');
     } catch (e) {
+      console.log('[DevTools Panel] setupMessageListener() failed, using fallback');
       // Fallback to direct listener if connection approach fails
       setupDirectListener();
     }
 
     // Initial render
+    console.log('[DevTools Panel] Calling initial render...');
     render();
+    console.log('[DevTools Panel] Initialization complete');
   }
 
+  console.log('[DevTools Panel] Calling initialize()...');
   initialize();
+  console.log('[DevTools Panel] After initialize() call');
+
+  } catch (error) {
+    console.error('[DevTools Panel] FATAL ERROR:', error);
+    console.error('[DevTools Panel] Stack trace:', error.stack);
+  }
 })();
+
+console.log('[DevTools Panel] Script finished loading');
