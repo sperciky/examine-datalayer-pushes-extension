@@ -236,10 +236,13 @@
    * Render all logs to the UI
    */
   function render() {
-    // Clear content except empty state
-    while (content.firstChild && content.firstChild !== emptyState) {
-      content.removeChild(content.firstChild);
-    }
+    // Clear all log entries (keep only emptyState)
+    const children = Array.from(content.children);
+    children.forEach(child => {
+      if (child !== emptyState) {
+        content.removeChild(child);
+      }
+    });
 
     const filteredLogs = logs.filter(matchesFilter);
 
@@ -261,10 +264,16 @@
     } else {
       emptyState.style.display = 'none';
 
-      // Render logs in reverse order (newest first)
+      // Render logs with NEWEST FIRST (latest logs at top)
+      // Iterate in reverse order so newest entries are rendered first
       for (let i = filteredLogs.length - 1; i >= 0; i--) {
         const logEntry = createLogEntry(filteredLogs[i], i);
-        content.appendChild(logEntry);
+        // Insert after emptyState (which is display:none) to show at top
+        if (emptyState.nextSibling) {
+          content.insertBefore(logEntry, emptyState.nextSibling);
+        } else {
+          content.appendChild(logEntry);
+        }
       }
     }
 
