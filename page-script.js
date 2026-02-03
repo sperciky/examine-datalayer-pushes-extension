@@ -29,45 +29,93 @@
 
   /**
    * Parse error stack to extract file, line, and column information
+   * Intelligently skips Chrome extension frames to find the actual page code
    */
   function parseStackTrace(stack) {
     if (!stack) return null;
 
     const lines = stack.split('\n');
+    let immediateCallerIndex = -1;
+    let immediateCallerInfo = null;
+    let pageCallerIndex = -1;
+    let pageCallerInfo = null;
+    let hasExtensionFrames = false;
+
     // Skip first line (Error message) and second line (our wrapper function)
-    // Get the actual caller
+    // Parse all frames to find both immediate caller and first page caller
     for (let i = 2; i < lines.length; i++) {
       const line = lines[i];
 
       // Match Chrome/Edge format: "at functionName (file:line:column)"
       // or "at file:line:column"
       const chromeMatch = line.match(/at\s+(?:.*?\s+\()?(.+?):(\d+):(\d+)\)?$/);
-      if (chromeMatch) {
-        return {
-          file: chromeMatch[1],
-          line: parseInt(chromeMatch[2], 10),
-          column: parseInt(chromeMatch[3], 10),
-          fullStack: stack
-        };
+      const firefoxMatch = line.match(/^.*?@(.+?):(\d+):(\d+)$/);
+
+      const match = chromeMatch || firefoxMatch;
+      if (!match) continue;
+
+      const fileUrl = match[1];
+      const lineNum = parseInt(match[2], 10);
+      const colNum = parseInt(match[3], 10);
+
+      const frameInfo = {
+        file: fileUrl,
+        line: lineNum,
+        column: colNum,
+        stackLineIndex: i,
+        fullStack: stack
+      };
+
+      // Store the immediate caller (first valid frame)
+      if (immediateCallerIndex === -1) {
+        immediateCallerIndex = i;
+        immediateCallerInfo = frameInfo;
       }
 
-      // Match Firefox format: "functionName@file:line:column"
-      const firefoxMatch = line.match(/^.*?@(.+?):(\d+):(\d+)$/);
-      if (firefoxMatch) {
-        return {
-          file: firefoxMatch[1],
-          line: parseInt(firefoxMatch[2], 10),
-          column: parseInt(firefoxMatch[3], 10),
-          fullStack: stack
-        };
+      // Check if this is a Chrome extension URL
+      const isExtension = fileUrl.startsWith('chrome-extension://') ||
+                          fileUrl.startsWith('moz-extension://') ||
+                          fileUrl.startsWith('webkit-extension://');
+
+      if (isExtension) {
+        hasExtensionFrames = true;
+      }
+
+      // Store the first non-extension frame (actual page code)
+      if (!isExtension && pageCallerIndex === -1) {
+        pageCallerIndex = i;
+        pageCallerInfo = frameInfo;
+        break; // Found what we're looking for
       }
     }
 
+    // Prefer page caller over extension caller
+    const callerInfo = pageCallerInfo || immediateCallerInfo;
+
+    if (!callerInfo) {
+      return {
+        file: 'unknown',
+        line: 0,
+        column: 0,
+        stackLineIndex: 2,
+        fullStack: stack,
+        hasExtensionFrames: false
+      };
+    }
+
     return {
-      file: 'unknown',
-      line: 0,
-      column: 0,
-      fullStack: stack
+      file: callerInfo.file,
+      line: callerInfo.line,
+      column: callerInfo.column,
+      stackLineIndex: callerInfo.stackLineIndex,
+      fullStack: stack,
+      hasExtensionFrames: hasExtensionFrames,
+      // Include immediate caller if different (for transparency)
+      immediateCaller: immediateCallerInfo !== pageCallerInfo ? {
+        file: immediateCallerInfo?.file,
+        line: immediateCallerInfo?.line,
+        column: immediateCallerInfo?.column
+      } : null
     };
   }
 

@@ -86,12 +86,14 @@
 
     // Get full file path for title
     const fullPath = log.stackTrace?.file || 'unknown';
+    const hasExtensions = log.stackTrace?.hasExtensionFrames || false;
 
     headerLeft.innerHTML = `
       <span class="expand-icon">▶</span>
       <span class="object-name">${log.objectName}</span>
       ${eventName ? `<span class="event-name">${eventName}</span>` : ''}
       ${isPreHook ? '<span class="pre-hook-badge">Pre-Hook</span>' : ''}
+      ${hasExtensions && !isPreHook ? '<span class="extension-badge" title="Push went through browser extensions">Via Extension</span>' : ''}
     `;
 
     const headerRight = document.createElement('div');
@@ -120,10 +122,27 @@
     if (!isPreHook && log.stackTrace && log.stackTrace.file) {
       const callerSection = document.createElement('div');
       callerSection.className = 'section';
-      callerSection.innerHTML = `
-        <div class="section-title">📍 Called From</div>
+
+      // Check if there's an intermediate extension caller
+      const immediateCaller = log.stackTrace.immediateCaller;
+      let callerHTML = `<div class="section-title">📍 Called From (Page Code)</div>`;
+
+      // Show intermediate extension caller if present
+      if (immediateCaller) {
+        callerHTML += `
+          <div class="intermediate-caller">
+            <div class="intermediate-caller-label">⚠️ Via Extension:</div>
+            ${escapeHtml(immediateCaller.file)}:${immediateCaller.line}:${immediateCaller.column}
+          </div>
+        `;
+        callerHTML += `<div class="section-title" style="margin-top: 12px;">📍 Original Source (Page Code)</div>`;
+      }
+
+      callerHTML += `
         <div class="caller-badge" title="${escapeHtml(log.stackTrace.file)}">${escapeHtml(log.stackTrace.file)}:${log.stackTrace.line}:${log.stackTrace.column}</div>
       `;
+
+      callerSection.innerHTML = callerHTML;
       bodyDiv.appendChild(callerSection);
     }
 
@@ -141,11 +160,22 @@
       const stackSection = document.createElement('div');
       stackSection.className = 'section';
 
+      // Use the stackLineIndex from parsed stack info for accurate highlighting
+      const highlightIndex = log.stackTrace.stackLineIndex || 2;
+
       const stackLines = (log.stackTrace.fullStack || '').split('\n')
         .map((line, i) => {
-          // Highlight the actual caller (skip Error and wrapper lines)
-          const isHighlight = i === 2;
-          return `<div class="stack-line ${isHighlight ? 'stack-highlight' : ''}">${escapeHtml(line)}</div>`;
+          // Highlight the actual page caller
+          const isHighlight = i === highlightIndex;
+
+          // Check if this line contains an extension URL
+          const isExtensionFrame = line.includes('chrome-extension://') ||
+                                   line.includes('moz-extension://') ||
+                                   line.includes('webkit-extension://');
+
+          const frameClass = isExtensionFrame ? 'extension-frame' : 'page-frame';
+
+          return `<div class="stack-line ${isHighlight ? 'stack-highlight' : ''} ${frameClass}" title="${isExtensionFrame ? 'Browser extension frame' : 'Page code frame'}">${escapeHtml(line)}</div>`;
         })
         .join('');
 
