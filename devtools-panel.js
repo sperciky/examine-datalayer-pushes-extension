@@ -35,6 +35,7 @@ console.log('[DevTools Panel] Script starting to load...');
   const logCount = document.getElementById('logCount');
   const persistCheckbox = document.getElementById('persistCheckbox');
   const versionBadge = document.getElementById('versionBadge');
+  const connectionStatus = document.getElementById('connectionStatus');
 
   console.log('[DevTools Panel] UI elements:', {
     content: !!content,
@@ -43,7 +44,8 @@ console.log('[DevTools Panel] Script starting to load...');
     filterInput: !!filterInput,
     logCount: !!logCount,
     persistCheckbox: !!persistCheckbox,
-    versionBadge: !!versionBadge
+    versionBadge: !!versionBadge,
+    connectionStatus: !!connectionStatus
   });
 
   // Update version badge to show script loaded successfully
@@ -522,6 +524,38 @@ console.log('[DevTools Panel] Script starting to load...');
   }
 
   /**
+   * Update connection status badge
+   */
+  function updateConnectionStatus(status) {
+    if (!connectionStatus) return;
+
+    switch (status) {
+      case 'connected':
+        connectionStatus.textContent = '● Connected';
+        connectionStatus.style.background = '#34a853';
+        connectionStatus.style.color = 'white';
+        connectionStatus.title = 'Connected to background script';
+        break;
+      case 'connecting':
+        connectionStatus.textContent = '○ Connecting...';
+        connectionStatus.style.background = '#ffa726';
+        connectionStatus.style.color = 'white';
+        connectionStatus.title = 'Establishing connection...';
+        break;
+      case 'disconnected':
+        connectionStatus.textContent = '○ Disconnected';
+        connectionStatus.style.background = '#ea4335';
+        connectionStatus.style.color = 'white';
+        connectionStatus.title = 'Connection lost, will reconnect...';
+        break;
+      default:
+        connectionStatus.textContent = '○ Unknown';
+        connectionStatus.style.background = '#999';
+        connectionStatus.style.color = 'white';
+    }
+  }
+
+  /**
    * Setup message listener for intercepted events
    */
   let backgroundPageConnection = null;
@@ -535,6 +569,7 @@ console.log('[DevTools Panel] Script starting to load...');
     }
 
     console.log('[DevTools Panel] Creating connection to background script...');
+    updateConnectionStatus('connecting');
 
     // Create a connection to the background page
     backgroundPageConnection = chrome.runtime.connect({
@@ -548,6 +583,7 @@ console.log('[DevTools Panel] Script starting to load...');
     });
 
     console.log('[DevTools Panel] Connection established, sent INIT message');
+    updateConnectionStatus('connected');
 
     // Listen for messages from the background page
     backgroundPageConnection.onMessage.addListener((message) => {
@@ -561,17 +597,25 @@ console.log('[DevTools Panel] Script starting to load...');
 
     // Handle disconnection and automatically reconnect
     backgroundPageConnection.onDisconnect.addListener(() => {
-      console.warn('[DevTools Panel] Connection disconnected, reconnecting in 1 second...');
+      console.warn('[DevTools Panel] Connection disconnected');
+      updateConnectionStatus('disconnected');
       backgroundPageConnection = null;
 
-      // Reconnect after a short delay to avoid rapid reconnection attempts
+      // Reconnect after a short delay to allow the new page to fully load
+      // This gives the new content script time to inject and be ready
+      const delay = 500;
+      console.log(`[DevTools Panel] Reconnecting in ${delay}ms...`);
+      updateConnectionStatus('connecting');
+
       reconnectTimeout = setTimeout(() => {
         try {
+          console.log('[DevTools Panel] Attempting reconnection now...');
           setupMessageListener();
         } catch (e) {
           console.error('[DevTools Panel] Reconnection failed:', e);
+          updateConnectionStatus('disconnected');
         }
-      }, 1000);
+      }, delay);
     });
   }
 
@@ -582,10 +626,16 @@ console.log('[DevTools Panel] Script starting to load...');
     if (chrome.devtools.network && chrome.devtools.network.onNavigated) {
       chrome.devtools.network.onNavigated.addListener((url) => {
         console.log('[DevTools Panel] Page navigated to:', url);
+        console.log('[DevTools Panel] Persist data enabled:', persistData);
 
-        // Update current URL for persist data feature
+        // If persist data is disabled, clear logs on navigation
         if (!persistData) {
+          console.log('[DevTools Panel] Persist data disabled, clearing logs...');
+          logs = [];
           currentUrl = url;
+          render();
+        } else {
+          console.log('[DevTools Panel] Persist data enabled, keeping logs across navigation');
         }
 
         // Reconnect to ensure we're receiving messages from the new page
@@ -595,11 +645,17 @@ console.log('[DevTools Panel] Script starting to load...');
             backgroundPageConnection.disconnect();
           } catch (e) {
             // Connection might already be disconnected
+            console.log('[DevTools Panel] Disconnect error (expected if already disconnected):', e.message);
           }
           // setupMessageListener will be called by the onDisconnect handler
+        } else {
+          console.warn('[DevTools Panel] No background connection found, setting up new connection...');
+          setupMessageListener();
         }
       });
       console.log('[DevTools Panel] Navigation listener setup complete');
+    } else {
+      console.warn('[DevTools Panel] chrome.devtools.network.onNavigated not available');
     }
   }
 
