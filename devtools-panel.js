@@ -524,9 +524,20 @@ console.log('[DevTools Panel] Script starting to load...');
   /**
    * Setup message listener for intercepted events
    */
+  let backgroundPageConnection = null;
+  let reconnectTimeout = null;
+
   function setupMessageListener() {
+    // Clear any existing reconnect timeout
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+
+    console.log('[DevTools Panel] Creating connection to background script...');
+
     // Create a connection to the background page
-    const backgroundPageConnection = chrome.runtime.connect({
+    backgroundPageConnection = chrome.runtime.connect({
       name: 'devtools-panel'
     });
 
@@ -536,14 +547,60 @@ console.log('[DevTools Panel] Script starting to load...');
       tabId: chrome.devtools.inspectedWindow.tabId
     });
 
+    console.log('[DevTools Panel] Connection established, sent INIT message');
+
     // Listen for messages from the background page
     backgroundPageConnection.onMessage.addListener((message) => {
+      console.log('[DevTools Panel] Received message:', message.type);
       if (message.type === 'DATALAYER_PUSH_INTERCEPTED') {
         addLog('regular', message.data, message.url);
       } else if (message.type === 'DATALAYER_PRE_HOOK_SNAPSHOT') {
         addLog('pre-hook', message.data, message.url);
       }
     });
+
+    // Handle disconnection and automatically reconnect
+    backgroundPageConnection.onDisconnect.addListener(() => {
+      console.warn('[DevTools Panel] Connection disconnected, reconnecting in 1 second...');
+      backgroundPageConnection = null;
+
+      // Reconnect after a short delay to avoid rapid reconnection attempts
+      reconnectTimeout = setTimeout(() => {
+        try {
+          setupMessageListener();
+        } catch (e) {
+          console.error('[DevTools Panel] Reconnection failed:', e);
+        }
+      }, 1000);
+    });
+  }
+
+  /**
+   * Setup page navigation listener to handle page changes
+   */
+  function setupNavigationListener() {
+    if (chrome.devtools.network && chrome.devtools.network.onNavigated) {
+      chrome.devtools.network.onNavigated.addListener((url) => {
+        console.log('[DevTools Panel] Page navigated to:', url);
+
+        // Update current URL for persist data feature
+        if (!persistData) {
+          currentUrl = url;
+        }
+
+        // Reconnect to ensure we're receiving messages from the new page
+        if (backgroundPageConnection) {
+          console.log('[DevTools Panel] Reconnecting after navigation...');
+          try {
+            backgroundPageConnection.disconnect();
+          } catch (e) {
+            // Connection might already be disconnected
+          }
+          // setupMessageListener will be called by the onDisconnect handler
+        }
+      });
+      console.log('[DevTools Panel] Navigation listener setup complete');
+    }
   }
 
   /**
@@ -619,6 +676,10 @@ console.log('[DevTools Panel] Script starting to load...');
     // Load persist preference
     console.log('[DevTools Panel] Loading persist preference...');
     await loadPersistPreference();
+
+    // Setup navigation listener to handle page changes
+    console.log('[DevTools Panel] Setting up navigation listener...');
+    setupNavigationListener();
 
     // Setup message listeners
     console.log('[DevTools Panel] Setting up message listeners...');
