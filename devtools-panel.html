@@ -359,6 +359,44 @@
       font-family: 'Courier New', monospace;
       color: #333;
     }
+
+    .persist-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #666;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .persist-checkbox input[type="checkbox"] {
+      cursor: pointer;
+      width: 14px;
+      height: 14px;
+    }
+
+    .persist-checkbox:hover {
+      color: #333;
+    }
+
+    .url-badge {
+      display: inline-block;
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 500;
+      margin-left: 8px;
+      border: 1px solid #a5d6a7;
+    }
+
+    .url-badge.different-url {
+      background: #fff3e0;
+      color: #e65100;
+      border: 1px solid #ffb74d;
+    }
   </style>
 </head>
 <body>
@@ -379,6 +417,15 @@
         placeholder="Event name..."
         autocomplete="off"
       />
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+      <label class="persist-checkbox" title="Keep logs when navigating to a new page">
+        <input type="checkbox" id="persistCheckbox" />
+        <span>Persist Data</span>
+      </label>
     </div>
   </div>
 

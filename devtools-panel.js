@@ -12,10 +12,13 @@
   const clearButton = document.getElementById('clearButton');
   const filterInput = document.getElementById('filterInput');
   const logCount = document.getElementById('logCount');
+  const persistCheckbox = document.getElementById('persistCheckbox');
 
   // State
   let logs = [];
   let currentFilter = '';
+  let currentUrl = '';
+  let persistData = false;
 
   /**
    * Format timestamp to readable string
@@ -88,12 +91,19 @@
     const fullPath = log.stackTrace?.file || 'unknown';
     const hasExtensions = log.stackTrace?.hasExtensionFrames || false;
 
+    // Check if this log is from a different URL (when persisting)
+    const isDifferentUrl = persistData && log.url && log.url !== currentUrl;
+    const urlBadge = isDifferentUrl
+      ? `<span class="url-badge different-url" title="${escapeHtml(log.url)}">${escapeHtml(getShortenedUrl(log.url))}</span>`
+      : '';
+
     headerLeft.innerHTML = `
       <span class="expand-icon">▶</span>
       <span class="object-name">${log.objectName}</span>
       ${eventName ? `<span class="event-name">${eventName}</span>` : ''}
       ${isPreHook ? '<span class="pre-hook-badge">Pre-Hook</span>' : ''}
       ${hasExtensions && !isPreHook ? '<span class="extension-badge" title="Push went through browser extensions">Via Extension</span>' : ''}
+      ${urlBadge}
     `;
 
     const headerRight = document.createElement('div');
@@ -263,15 +273,53 @@
   }
 
   /**
+   * Check if URL changed and handle accordingly
+   */
+  function checkUrlChange(newUrl) {
+    if (!newUrl) return;
+
+    // First log or URL hasn't been set yet
+    if (!currentUrl) {
+      currentUrl = newUrl;
+      return;
+    }
+
+    // URL changed
+    if (currentUrl !== newUrl) {
+      // If persist is not enabled, clear logs
+      if (!persistData) {
+        logs = [];
+      }
+      currentUrl = newUrl;
+    }
+  }
+
+  /**
+   * Get shortened URL for display
+   */
+  function getShortenedUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname + urlObj.pathname.substring(0, 30);
+    } catch (e) {
+      return url.substring(0, 40);
+    }
+  }
+
+  /**
    * Add a new log entry
    */
-  function addLog(type, data) {
+  function addLog(type, data, url) {
+    // Check if we need to clear logs due to URL change
+    checkUrlChange(url);
+
     const log = {
       type: type,
       objectName: data.objectName,
       timestamp: data.timestamp,
       arguments: type === 'pre-hook' ? data.entries : data.arguments,
-      stackTrace: data.stackTrace || null
+      stackTrace: data.stackTrace || null,
+      url: url || currentUrl // Store URL with each log
     };
 
     logs.push(log);
@@ -312,9 +360,9 @@
     // Listen for messages from the background page
     backgroundPageConnection.onMessage.addListener((message) => {
       if (message.type === 'DATALAYER_PUSH_INTERCEPTED') {
-        addLog('regular', message.data);
+        addLog('regular', message.data, message.url);
       } else if (message.type === 'DATALAYER_PRE_HOOK_SNAPSHOT') {
-        addLog('pre-hook', message.data);
+        addLog('pre-hook', message.data, message.url);
       }
     });
   }
@@ -328,25 +376,60 @@
       // Only process messages from the inspected tab
       if (sender.tab && sender.tab.id === chrome.devtools.inspectedWindow.tabId) {
         if (message.type === 'DATALAYER_PUSH_INTERCEPTED') {
-          addLog('regular', message.data);
+          addLog('regular', message.data, message.url);
         } else if (message.type === 'DATALAYER_PRE_HOOK_SNAPSHOT') {
-          addLog('pre-hook', message.data);
+          addLog('pre-hook', message.data, message.url);
         }
       }
     });
   }
 
+  /**
+   * Load persist data preference
+   */
+  async function loadPersistPreference() {
+    try {
+      const result = await chrome.storage.local.get({ persistData: false });
+      persistData = result.persistData;
+      persistCheckbox.checked = persistData;
+    } catch (e) {
+      // Ignore errors, default to false
+    }
+  }
+
+  /**
+   * Handle persist checkbox change
+   */
+  async function handlePersistChange() {
+    persistData = persistCheckbox.checked;
+    try {
+      await chrome.storage.local.set({ persistData: persistData });
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
   // Event listeners
   clearButton.addEventListener('click', clearLogs);
   filterInput.addEventListener('input', handleFilter);
+  persistCheckbox.addEventListener('change', handlePersistChange);
 
   // Initialize
-  try {
-    setupMessageListener();
-  } catch (e) {
-    // Fallback to direct listener if connection approach fails
-    setupDirectListener();
+  async function initialize() {
+    // Load persist preference
+    await loadPersistPreference();
+
+    // Setup message listeners
+    try {
+      setupMessageListener();
+    } catch (e) {
+      // Fallback to direct listener if connection approach fails
+      setupDirectListener();
+    }
+
+    // Initial render
+    render();
   }
 
-  render();
+  initialize();
 })();
