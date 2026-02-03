@@ -291,7 +291,9 @@ console.log('[DevTools Panel] Script starting to load...');
 
     const frameClass = isExtensionFrame ? 'extension-frame' : 'page-frame';
     const highlightClass = isHighlight ? 'stack-highlight' : '';
-    const title = isExtensionFrame ? 'Browser extension frame' : 'Click to open in Sources panel';
+    const title = isExtensionFrame
+      ? 'Browser extension frame'
+      : `Click to open at Line ${parsed?.line}:${parsed?.column}\nTip: Use Ctrl/Cmd+P in Sources, then :${parsed?.line}:${parsed?.column}`;
 
     if (parsed && !isExtensionFrame) {
       // Create a clickable line
@@ -313,15 +315,24 @@ console.log('[DevTools Panel] Script starting to load...');
       // Handle click to open in DevTools Sources panel
       div.addEventListener('click', (e) => {
         e.stopPropagation();
+
+        // Log the exact position to console for easy copying
+        console.log(`%c[DataLayer Debugger] Navigate to: ${parsed.url}:${parsed.line}:${parsed.column}`,
+                   'color: #1976d2; font-weight: bold; font-size: 12px;');
+        console.log(`%cTip: Press Ctrl/Cmd+P in Sources panel, then type ":${parsed.line}:${parsed.column}" to jump to exact position`,
+                   'color: #666; font-style: italic;');
+
         try {
-          // Try to open the resource in Sources panel
+          // Open the resource in Sources panel at the line
+          // Note: openResource API only supports line, not column
+          // User can then use Ctrl+G or Cmd+G and type :line:column to navigate to exact position
           chrome.devtools.panels.openResource(parsed.url, parsed.line - 1, () => {
             if (chrome.runtime.lastError) {
               console.warn('[DevTools Panel] Could not open resource:', chrome.runtime.lastError.message);
-              // Fallback: try to navigate using inspectedWindow.eval
-              chrome.devtools.inspectedWindow.eval(
-                `console.log('Navigate to:', '${parsed.url}:${parsed.line}:${parsed.column}')`
-              );
+            } else {
+              // Show a notification about how to navigate to exact column
+              console.info(`%c✓ Opened at line ${parsed.line}. To jump to column ${parsed.column}, press Ctrl/Cmd+G and type ":${parsed.line}:${parsed.column}"`,
+                          'color: #4caf50; font-weight: bold;');
             }
           });
         } catch (error) {
