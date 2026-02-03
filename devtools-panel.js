@@ -236,17 +236,30 @@
    * Render all logs to the UI
    */
   function render() {
+    console.log('[DevTools Panel] render() called');
+    console.log('[DevTools Panel] Total logs:', logs.length);
+    console.log('[DevTools Panel] Current filter:', currentFilter);
+
     // Clear all log entries (keep only emptyState)
     const children = Array.from(content.children);
+    console.log('[DevTools Panel] Total children before clear:', children.length);
+
+    let removedCount = 0;
     children.forEach(child => {
       if (child !== emptyState) {
+        console.log('[DevTools Panel] Removing child:', child.className);
         content.removeChild(child);
+        removedCount++;
       }
     });
+    console.log('[DevTools Panel] Removed', removedCount, 'children');
+    console.log('[DevTools Panel] Remaining children:', content.children.length);
 
     const filteredLogs = logs.filter(matchesFilter);
+    console.log('[DevTools Panel] Filtered logs:', filteredLogs.length);
 
     if (filteredLogs.length === 0) {
+      console.log('[DevTools Panel] Showing empty state');
       emptyState.style.display = 'block';
       if (logs.length > 0 && currentFilter) {
         emptyState.innerHTML = `
@@ -262,6 +275,7 @@
         `;
       }
     } else {
+      console.log('[DevTools Panel] Hiding empty state and rendering', filteredLogs.length, 'logs');
       emptyState.style.display = 'none';
 
       // Render logs with NEWEST FIRST (latest logs at top)
@@ -275,10 +289,12 @@
           content.appendChild(logEntry);
         }
       }
+      console.log('[DevTools Panel] Finished rendering. Total children now:', content.children.length);
     }
 
     // Update count
     logCount.textContent = `${logs.length} event${logs.length !== 1 ? 's' : ''}`;
+    console.log('[DevTools Panel] Updated count to:', logs.length);
   }
 
   /**
@@ -319,6 +335,8 @@
    * Add a new log entry
    */
   function addLog(type, data, url) {
+    console.log('[DevTools Panel] addLog() called. Type:', type, 'URL:', url);
+
     // Check if we need to clear logs due to URL change
     checkUrlChange(url);
 
@@ -332,6 +350,7 @@
     };
 
     logs.push(log);
+    console.log('[DevTools Panel] Log added. Total logs now:', logs.length);
     render();
   }
 
@@ -339,8 +358,12 @@
    * Clear all logs
    */
   function clearLogs() {
+    console.log('[DevTools Panel] Clear button clicked');
+    console.log('[DevTools Panel] Logs before clear:', logs.length);
     logs = [];
     currentUrl = ''; // Reset URL tracking for fresh start
+    console.log('[DevTools Panel] Logs after clear:', logs.length);
+    console.log('[DevTools Panel] Calling render()...');
     render();
   }
 
