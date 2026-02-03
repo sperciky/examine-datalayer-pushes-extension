@@ -150,10 +150,18 @@
     }
 
     try {
-      // Retrieve the configured object name from storage
+      // Retrieve the configured object name and enabled state from storage
       const result = await chrome.storage.sync.get({
-        observedObject: 'dataLayer' // Default value
+        observedObject: 'dataLayer', // Default value
+        extensionEnabled: true // Default to enabled
       });
+
+      // Check if extension is enabled
+      const isEnabled = result.extensionEnabled !== false; // Default to true if undefined
+      if (!isEnabled) {
+        // Extension is disabled, do not inject
+        return;
+      }
 
       const observedObjectName = result.observedObject || 'dataLayer';
 
