@@ -319,10 +319,11 @@ console.log('[DevTools Panel] Script starting to load...');
       emptyState.style.display = 'none';
 
       // Render logs with NEWEST FIRST (latest logs at top)
-      // Iterate in reverse order so newest entries are rendered first
-      for (let i = filteredLogs.length - 1; i >= 0; i--) {
+      // Iterate forwards, inserting each entry right after emptyState
+      // This pushes older entries down, keeping newest at top
+      for (let i = 0; i < filteredLogs.length; i++) {
         const logEntry = createLogEntry(filteredLogs[i], i);
-        // Insert after emptyState (which is display:none) to show at top
+        // Insert right after emptyState - each insertion pushes previous entries down
         if (emptyState.nextSibling) {
           content.insertBefore(logEntry, emptyState.nextSibling);
         } else {
