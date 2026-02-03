@@ -13,6 +13,33 @@
  * This is the only way to intercept actual page-level window.dataLayer.
  */
 
+// CRITICAL: Suppress "Extension context invalidated" errors FIRST
+// This must run before any other code to catch errors from this script
+// and any other scripts that might trigger during extension reload
+(function() {
+  'use strict';
+
+  // Suppress synchronous errors
+  window.addEventListener('error', function(event) {
+    if (event.message && event.message.includes('Extension context invalidated')) {
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    }
+  }, true);
+
+  // Suppress Promise rejections
+  window.addEventListener('unhandledrejection', function(event) {
+    if (event.reason && event.reason.message &&
+        event.reason.message.includes('Extension context invalidated')) {
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    }
+  }, true);
+})();
+
+// Main content script
 (function() {
   'use strict';
 
@@ -144,26 +171,6 @@
       }
     }
   }
-
-  // Suppress "Extension context invalidated" errors globally
-  // This prevents console pollution when extension is reloaded
-  window.addEventListener('error', (event) => {
-    if (event.message && event.message.includes('Extension context invalidated')) {
-      event.preventDefault();
-      event.stopPropagation();
-      return true;
-    }
-  }, true);
-
-  // Also suppress unhandled promise rejections
-  window.addEventListener('unhandledrejection', (event) => {
-    if (event.reason && event.reason.message &&
-        event.reason.message.includes('Extension context invalidated')) {
-      event.preventDefault();
-      event.stopPropagation();
-      return true;
-    }
-  }, true);
 
   // Run initialization
   initialize();
