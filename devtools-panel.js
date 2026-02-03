@@ -293,7 +293,7 @@ console.log('[DevTools Panel] Script starting to load...');
     const highlightClass = isHighlight ? 'stack-highlight' : '';
     const title = isExtensionFrame
       ? 'Browser extension frame'
-      : `Click to open at Line ${parsed?.line}:${parsed?.column}\nTip: Use Ctrl/Cmd+P in Sources, then :${parsed?.line}:${parsed?.column}`;
+      : `Click to open in Sources at line ${parsed?.line}, column ${parsed?.column}`;
 
     if (parsed && !isExtensionFrame) {
       // Create a clickable line
@@ -317,48 +317,20 @@ console.log('[DevTools Panel] Script starting to load...');
         e.stopPropagation();
 
         try {
-          // Create a clickable link in the console that navigates to exact position
-          // Chrome DevTools makes URLs in console.log clickable if they include line:column
-          const fullLocation = `${parsed.url}:${parsed.line}:${parsed.column}`;
-          const escapedUrl = parsed.url.replace(/'/g, "\\'").replace(/\n/g, '\\n');
-
-          const evalCode = `
-            (function() {
-              console.group('%c📍 DataLayer Push Source Location', 'color: #1976d2; font-weight: bold; font-size: 13px; padding: 4px 0;');
-              console.log('%cClick the link below to navigate to exact position:', 'color: #666; font-size: 11px;');
-              console.log('%c${fullLocation}', 'color: #0066cc; font-size: 12px; text-decoration: underline; cursor: pointer;');
-
-              // Also create a clickable error stack trace as backup
-              try {
-                // Create a function at runtime that will appear in the stack trace at the exact location
-                const dynFunc = new Function(\`
-                  return (function sourceLocation() {
-                    throw new Error('⬆️ Click stack trace above to navigate');
-                  })();
-                \`);
-                dynFunc();
-              } catch (e) {
-                // Manually construct stack to point to exact location
-                e.stack = 'Error: ⬆️ Click the line below to jump to exact position\\n    at ${escapedUrl}:${parsed.line}:${parsed.column}';
-                console.log(e);
+          // Open the resource in Sources panel at exact line AND column
+          // Both lineNumber and columnNumber are 0-based, so subtract 1
+          chrome.devtools.panels.openResource(
+            parsed.url,
+            parsed.line - 1,
+            parsed.column - 1,
+            () => {
+              if (chrome.runtime.lastError) {
+                console.warn('[DevTools Panel] Could not open resource:', chrome.runtime.lastError.message);
+              } else {
+                console.log(`[DevTools Panel] Opened ${parsed.url} at line ${parsed.line}, column ${parsed.column}`);
               }
-              console.groupEnd();
-            })();
-          `;
-
-          // Evaluate in the inspected window to create a clickable console link
-          chrome.devtools.inspectedWindow.eval(evalCode, (result, exceptionInfo) => {
-            if (exceptionInfo) {
-              console.warn('[DevTools Panel] Could not create clickable link:', exceptionInfo);
             }
-          });
-
-          // Also try to open the resource at the line (best effort)
-          chrome.devtools.panels.openResource(parsed.url, parsed.line - 1, () => {
-            if (chrome.runtime.lastError) {
-              console.warn('[DevTools Panel] Could not open resource:', chrome.runtime.lastError.message);
-            }
-          });
+          );
         } catch (error) {
           console.error('[DevTools Panel] Error opening resource:', error);
         }
