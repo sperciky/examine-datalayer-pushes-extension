@@ -12,6 +12,20 @@ console.log('[DevTools Panel] Script starting to load...');
 
   try {
 
+  // IMMEDIATELY add a visible banner to confirm script is loading
+  const loadBanner = document.createElement('div');
+  loadBanner.id = 'loadBanner';
+  loadBanner.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #4caf50; color: white; padding: 8px; text-align: center; font-weight: bold; z-index: 9999; font-size: 12px;';
+  loadBanner.textContent = `✓ Script Loaded: ${new Date().toLocaleTimeString()}`;
+  document.body.insertBefore(loadBanner, document.body.firstChild);
+
+  // Remove banner after 3 seconds
+  setTimeout(() => {
+    if (loadBanner && loadBanner.parentNode) {
+      loadBanner.parentNode.removeChild(loadBanner);
+    }
+  }, 3000);
+
   // UI Elements
   console.log('[DevTools Panel] Getting UI elements...');
   const content = document.getElementById('content');
@@ -20,6 +34,7 @@ console.log('[DevTools Panel] Script starting to load...');
   const filterInput = document.getElementById('filterInput');
   const logCount = document.getElementById('logCount');
   const persistCheckbox = document.getElementById('persistCheckbox');
+  const versionBadge = document.getElementById('versionBadge');
 
   console.log('[DevTools Panel] UI elements:', {
     content: !!content,
@@ -27,8 +42,17 @@ console.log('[DevTools Panel] Script starting to load...');
     clearButton: !!clearButton,
     filterInput: !!filterInput,
     logCount: !!logCount,
-    persistCheckbox: !!persistCheckbox
+    persistCheckbox: !!persistCheckbox,
+    versionBadge: !!versionBadge
   });
+
+  // Update version badge to show script loaded successfully
+  if (versionBadge) {
+    const loadTime = new Date().toLocaleTimeString();
+    versionBadge.textContent = `Loaded: ${loadTime}`;
+    versionBadge.title = `Script loaded at ${loadTime}`;
+    console.log('[DevTools Panel] Version badge updated:', loadTime);
+  }
 
   // State
   let logs = [];
@@ -374,13 +398,27 @@ console.log('[DevTools Panel] Script starting to load...');
    * Clear all logs
    */
   function clearLogs() {
-    console.log('[DevTools Panel] Clear button clicked');
+    console.log('[DevTools Panel] ========== CLEAR BUTTON CLICKED ==========');
     console.log('[DevTools Panel] Logs before clear:', logs.length);
+    console.log('[DevTools Panel] Content children before clear:', content.children.length);
+
+    // Clear the logs array
     logs = [];
     currentUrl = ''; // Reset URL tracking for fresh start
+    currentFilter = ''; // Reset filter
+
     console.log('[DevTools Panel] Logs after clear:', logs.length);
+    console.log('[DevTools Panel] Current URL reset to:', currentUrl);
+    console.log('[DevTools Panel] Current filter reset to:', currentFilter);
+
+    // Clear filter input
+    if (filterInput) {
+      filterInput.value = '';
+    }
+
     console.log('[DevTools Panel] Calling render()...');
     render();
+    console.log('[DevTools Panel] ========== CLEAR COMPLETE ==========');
   }
 
   /**
