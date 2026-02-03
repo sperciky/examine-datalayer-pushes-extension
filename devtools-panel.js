@@ -84,6 +84,9 @@
     const headerLeft = document.createElement('div');
     headerLeft.className = 'log-header-left';
 
+    // Get full file path for title
+    const fullPath = log.stackTrace?.file || 'unknown';
+
     headerLeft.innerHTML = `
       <span class="expand-icon">▶</span>
       <span class="object-name">${log.objectName}</span>
@@ -93,10 +96,18 @@
 
     const headerRight = document.createElement('div');
     headerRight.className = 'log-header-right';
-    headerRight.innerHTML = `
-      <span class="source-info" title="${log.stackTrace?.file || 'unknown'}">${sourceInfo}</span>
-      <span class="timestamp">${timestamp}</span>
-    `;
+
+    // Only show source-info for regular pushes (not pre-hook)
+    if (!isPreHook) {
+      headerRight.innerHTML = `
+        <span class="source-info" title="Click to see full stack trace&#10;&#10;Full path: ${escapeHtml(fullPath)}">${escapeHtml(sourceInfo)}</span>
+        <span class="timestamp">${timestamp}</span>
+      `;
+    } else {
+      headerRight.innerHTML = `
+        <span class="timestamp">${timestamp}</span>
+      `;
+    }
 
     headerDiv.appendChild(headerLeft);
     headerDiv.appendChild(headerRight);
@@ -104,6 +115,17 @@
     // Body (initially hidden)
     const bodyDiv = document.createElement('div');
     bodyDiv.className = 'log-body';
+
+    // Caller information section (prominent, only for regular pushes)
+    if (!isPreHook && log.stackTrace && log.stackTrace.file) {
+      const callerSection = document.createElement('div');
+      callerSection.className = 'section';
+      callerSection.innerHTML = `
+        <div class="section-title">📍 Called From</div>
+        <div class="caller-badge" title="${escapeHtml(log.stackTrace.file)}">${escapeHtml(log.stackTrace.file)}:${log.stackTrace.line}:${log.stackTrace.column}</div>
+      `;
+      bodyDiv.appendChild(callerSection);
+    }
 
     // Arguments section
     const argsSection = document.createElement('div');
@@ -128,26 +150,10 @@
         .join('');
 
       stackSection.innerHTML = `
-        <div class="section-title">Call Stack</div>
+        <div class="section-title">📚 Full Call Stack</div>
         <div class="stack-trace">${stackLines}</div>
       `;
       bodyDiv.appendChild(stackSection);
-
-      // Source info section
-      const infoSection = document.createElement('div');
-      infoSection.className = 'section';
-      infoSection.innerHTML = `
-        <div class="section-title">Source Information</div>
-        <div class="info-grid">
-          <span class="info-label">File:</span>
-          <span class="info-value">${log.stackTrace.file || 'unknown'}</span>
-          <span class="info-label">Line:</span>
-          <span class="info-value">${log.stackTrace.line || 0}</span>
-          <span class="info-label">Column:</span>
-          <span class="info-value">${log.stackTrace.column || 0}</span>
-        </div>
-      `;
-      bodyDiv.appendChild(infoSection);
     }
 
     entryDiv.appendChild(headerDiv);

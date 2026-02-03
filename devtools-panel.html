@@ -194,12 +194,33 @@
 
     .source-info {
       font-family: 'Courier New', monospace;
-      font-size: 11px;
-      color: #666;
+      font-size: 12px;
+      font-weight: 600;
+      color: #d32f2f;
+      background: #ffebee;
+      padding: 4px 8px;
+      border-radius: 4px;
       white-space: nowrap;
+      border: 1px solid #ffcdd2;
+    }
+
+    .source-info:hover {
+      background: #ffcdd2;
+    }
+
+    .caller-badge {
+      background: #e3f2fd;
+      color: #1565c0;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+      border: 1px solid #90caf9;
+      max-width: 400px;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 300px;
+      white-space: nowrap;
     }
 
     .pre-hook-badge {
@@ -260,18 +281,28 @@
       font-size: 11px;
       overflow-x: auto;
       white-space: pre;
-      max-height: 200px;
+      max-height: 300px;
       overflow-y: auto;
       color: #555;
+      line-height: 1.6;
     }
 
     .stack-line {
-      margin: 2px 0;
+      margin: 3px 0;
+      padding: 2px 4px;
+      border-radius: 2px;
     }
 
     .stack-highlight {
-      color: #d32f2f;
-      font-weight: 600;
+      background: #ffebee;
+      color: #c62828;
+      font-weight: 700;
+      border-left: 3px solid #d32f2f;
+      padding-left: 6px;
+    }
+
+    .stack-line:hover {
+      background: #e3f2fd;
     }
 
     .info-grid {
