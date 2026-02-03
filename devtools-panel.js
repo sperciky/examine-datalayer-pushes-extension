@@ -587,24 +587,37 @@ console.log('[DevTools Panel] Script starting to load...');
 
     // Listen for messages from the background page
     backgroundPageConnection.onMessage.addListener((message) => {
-      console.log('[DevTools Panel] Received message:', message.type);
+      console.log('[DevTools Panel] ===== MESSAGE RECEIVED =====');
+      console.log('[DevTools Panel] Type:', message.type);
+      console.log('[DevTools Panel] URL:', message.url);
+      console.log('[DevTools Panel] Data:', message.data);
+
       if (message.type === 'DATALAYER_PUSH_INTERCEPTED') {
+        console.log('[DevTools Panel] Adding regular log entry');
         addLog('regular', message.data, message.url);
       } else if (message.type === 'DATALAYER_PRE_HOOK_SNAPSHOT') {
+        console.log('[DevTools Panel] Adding pre-hook log entry');
         addLog('pre-hook', message.data, message.url);
+      } else {
+        console.warn('[DevTools Panel] Unknown message type:', message.type);
       }
+
+      console.log('[DevTools Panel] Total logs now:', logs.length);
     });
 
     // Handle disconnection and automatically reconnect
     backgroundPageConnection.onDisconnect.addListener(() => {
-      console.warn('[DevTools Panel] Connection disconnected');
+      console.warn('[DevTools Panel] ===== CONNECTION DISCONNECTED =====');
+      const error = chrome.runtime.lastError;
+      if (error) {
+        console.warn('[DevTools Panel] Disconnect reason:', error.message);
+      }
       updateConnectionStatus('disconnected');
       backgroundPageConnection = null;
 
-      // Reconnect after a short delay to allow the new page to fully load
-      // This gives the new content script time to inject and be ready
-      const delay = 500;
-      console.log(`[DevTools Panel] Reconnecting in ${delay}ms...`);
+      // Reconnect immediately - no delay needed
+      // The connection is between DevTools and background script, not tied to page lifecycle
+      console.log('[DevTools Panel] Reconnecting immediately...');
       updateConnectionStatus('connecting');
 
       reconnectTimeout = setTimeout(() => {
@@ -614,8 +627,17 @@ console.log('[DevTools Panel] Script starting to load...');
         } catch (e) {
           console.error('[DevTools Panel] Reconnection failed:', e);
           updateConnectionStatus('disconnected');
+          // Try again after a longer delay if failed
+          setTimeout(() => {
+            console.log('[DevTools Panel] Retrying connection after failure...');
+            try {
+              setupMessageListener();
+            } catch (e2) {
+              console.error('[DevTools Panel] Second reconnection attempt failed:', e2);
+            }
+          }, 2000);
         }
-      }, delay);
+      }, 100); // Very short delay, just to avoid rapid reconnection loops
     });
   }
 
@@ -625,8 +647,10 @@ console.log('[DevTools Panel] Script starting to load...');
   function setupNavigationListener() {
     if (chrome.devtools.network && chrome.devtools.network.onNavigated) {
       chrome.devtools.network.onNavigated.addListener((url) => {
-        console.log('[DevTools Panel] Page navigated to:', url);
+        console.log('[DevTools Panel] ===== PAGE NAVIGATED =====');
+        console.log('[DevTools Panel] New URL:', url);
         console.log('[DevTools Panel] Persist data enabled:', persistData);
+        console.log('[DevTools Panel] Connection exists:', !!backgroundPageConnection);
 
         // If persist data is disabled, clear logs on navigation
         if (!persistData) {
@@ -638,20 +662,19 @@ console.log('[DevTools Panel] Script starting to load...');
           console.log('[DevTools Panel] Persist data enabled, keeping logs across navigation');
         }
 
-        // Reconnect to ensure we're receiving messages from the new page
-        if (backgroundPageConnection) {
-          console.log('[DevTools Panel] Reconnecting after navigation...');
-          try {
-            backgroundPageConnection.disconnect();
-          } catch (e) {
-            // Connection might already be disconnected
-            console.log('[DevTools Panel] Disconnect error (expected if already disconnected):', e.message);
-          }
-          // setupMessageListener will be called by the onDisconnect handler
-        } else {
-          console.warn('[DevTools Panel] No background connection found, setting up new connection...');
+        // DO NOT disconnect the connection on navigation!
+        // The connection between DevTools panel and background script is persistent
+        // and works across page navigations within the same tab.
+        // The tabId doesn't change, so the existing connection continues to work.
+        // Only reconnect if there's no connection (shouldn't happen, but just in case)
+        if (!backgroundPageConnection) {
+          console.warn('[DevTools Panel] No connection found after navigation, creating one...');
           setupMessageListener();
+        } else {
+          console.log('[DevTools Panel] Connection is active, continuing to receive messages');
         }
+
+        console.log('[DevTools Panel] ===== NAVIGATION HANDLED =====');
       });
       console.log('[DevTools Panel] Navigation listener setup complete');
     } else {
