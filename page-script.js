@@ -126,7 +126,9 @@
     return function(...args) {
       // Capture stack trace immediately
       const stack = new Error().stack;
-      const stackInfo = parseStackTrace(stack);
+      // Remove "Error" prefix to clean up the stack trace
+      const cleanStack = stack.replace(/^Error\n/, '');
+      const stackInfo = parseStackTrace(cleanStack);
 
       // Prepare message payload
       const payload = {

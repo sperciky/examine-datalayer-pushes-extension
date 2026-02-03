@@ -213,8 +213,19 @@ console.log('[DevTools Panel] Script starting to load...');
       // Use the stackLineIndex from parsed stack info for accurate highlighting
       const highlightIndex = log.stackTrace.stackLineIndex || 2;
 
-      const stackLines = (log.stackTrace.fullStack || '').split('\n')
-        .map((line, i) => {
+      // Create stack section with title
+      const stackTitle = document.createElement('div');
+      stackTitle.className = 'section-title';
+      stackTitle.textContent = '📚 Full Call Stack';
+      stackSection.appendChild(stackTitle);
+
+      // Create stack trace container
+      const stackTraceContainer = document.createElement('div');
+      stackTraceContainer.className = 'stack-trace';
+
+      // Create clickable stack lines
+      (log.stackTrace.fullStack || '').split('\n').forEach((line, i) => {
+        if (line.trim()) {
           // Highlight the actual page caller
           const isHighlight = i === highlightIndex;
 
@@ -223,16 +234,12 @@ console.log('[DevTools Panel] Script starting to load...');
                                    line.includes('moz-extension://') ||
                                    line.includes('webkit-extension://');
 
-          const frameClass = isExtensionFrame ? 'extension-frame' : 'page-frame';
+          const stackLineElement = makeStackLineClickable(line, isHighlight, isExtensionFrame);
+          stackTraceContainer.appendChild(stackLineElement);
+        }
+      });
 
-          return `<div class="stack-line ${isHighlight ? 'stack-highlight' : ''} ${frameClass}" title="${isExtensionFrame ? 'Browser extension frame' : 'Page code frame'}">${escapeHtml(line)}</div>`;
-        })
-        .join('');
-
-      stackSection.innerHTML = `
-        <div class="section-title">📚 Full Call Stack</div>
-        <div class="stack-trace">${stackLines}</div>
-      `;
+      stackSection.appendChild(stackTraceContainer);
       bodyDiv.appendChild(stackSection);
     }
 
@@ -254,6 +261,83 @@ console.log('[DevTools Panel] Script starting to load...');
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  /**
+   * Parse a stack trace line to extract URL, line, and column
+   * Returns {url, line, column, text} or null if can't parse
+   */
+  function parseStackLine(line) {
+    // Match patterns like:
+    // at functionName (https://example.com/file.js:123:45)
+    // at https://example.com/file.js:123:45
+    const match = line.match(/(?:at\s+)?(?:.*?\s+)?\(?([^\s)]+):(\d+):(\d+)\)?/);
+    if (match) {
+      return {
+        url: match[1],
+        line: parseInt(match[2], 10),
+        column: parseInt(match[3], 10),
+        text: line.trim()
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Make a stack trace line clickable
+   */
+  function makeStackLineClickable(line, isHighlight, isExtensionFrame) {
+    const parsed = parseStackLine(line);
+
+    const frameClass = isExtensionFrame ? 'extension-frame' : 'page-frame';
+    const highlightClass = isHighlight ? 'stack-highlight' : '';
+    const title = isExtensionFrame ? 'Browser extension frame' : 'Click to open in Sources panel';
+
+    if (parsed && !isExtensionFrame) {
+      // Create a clickable line
+      const div = document.createElement('div');
+      div.className = `stack-line ${highlightClass} ${frameClass} clickable-stack`;
+      div.title = title;
+      div.textContent = line;
+      div.style.cursor = 'pointer';
+      div.style.textDecoration = 'none';
+
+      // Add hover effect
+      div.addEventListener('mouseenter', () => {
+        div.style.textDecoration = 'underline';
+      });
+      div.addEventListener('mouseleave', () => {
+        div.style.textDecoration = 'none';
+      });
+
+      // Handle click to open in DevTools Sources panel
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        try {
+          // Try to open the resource in Sources panel
+          chrome.devtools.panels.openResource(parsed.url, parsed.line - 1, () => {
+            if (chrome.runtime.lastError) {
+              console.warn('[DevTools Panel] Could not open resource:', chrome.runtime.lastError.message);
+              // Fallback: try to navigate using inspectedWindow.eval
+              chrome.devtools.inspectedWindow.eval(
+                `console.log('Navigate to:', '${parsed.url}:${parsed.line}:${parsed.column}')`
+              );
+            }
+          });
+        } catch (error) {
+          console.error('[DevTools Panel] Error opening resource:', error);
+        }
+      });
+
+      return div;
+    } else {
+      // Non-clickable line (extension frame or unparseable)
+      const div = document.createElement('div');
+      div.className = `stack-line ${highlightClass} ${frameClass}`;
+      div.title = title;
+      div.textContent = line;
+      return div;
+    }
   }
 
   /**
