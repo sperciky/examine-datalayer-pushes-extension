@@ -17,24 +17,46 @@
   'use strict';
 
   /**
+   * Check if the extension context is still valid
+   * Must be checked before any chrome.runtime API calls
+   */
+  function isExtensionContextValid() {
+    try {
+      // Try to access chrome.runtime.id - if context is invalidated, this will throw
+      return chrome.runtime && chrome.runtime.id;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
    * Inject the page script into the page's execution context
    */
   function injectPageScript(observedObjectName) {
-    // Create a script element
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('page-script.js');
+    // Check if extension context is valid before injecting
+    if (!isExtensionContextValid()) {
+      return;
+    }
 
-    // Pass configuration via data attribute
-    script.dataset.observedObject = observedObjectName;
+    try {
+      // Create a script element
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL('page-script.js');
 
-    // Inject as early as possible
-    // Use document.documentElement to inject even before <head> is parsed
-    (document.head || document.documentElement).appendChild(script);
+      // Pass configuration via data attribute
+      script.dataset.observedObject = observedObjectName;
 
-    // Remove script tag after execution to keep DOM clean
-    script.onload = () => {
-      script.remove();
-    };
+      // Inject as early as possible
+      // Use document.documentElement to inject even before <head> is parsed
+      (document.head || document.documentElement).appendChild(script);
+
+      // Remove script tag after execution to keep DOM clean
+      script.onload = () => {
+        script.remove();
+      };
+    } catch (e) {
+      // Extension context invalidated - silently fail
+    }
   }
 
   /**
@@ -53,15 +75,25 @@
         event.data.type === 'DATALAYER_PRE_HOOK_SNAPSHOT' ||
         event.data.type === 'DATALAYER_DEBUGGER_INITIALIZED'
       )) {
+        // Check if extension context is still valid before attempting to send message
+        if (!isExtensionContextValid()) {
+          // Extension was reloaded or disabled - stop trying to send messages
+          return;
+        }
+
         // Forward to background/DevTools via chrome.runtime messaging
-        chrome.runtime.sendMessage({
-          type: event.data.type,
-          data: event.data.data,
-          url: window.location.href,
-          frameId: window === window.top ? 0 : -1 // Simple frame detection
-        }).catch(() => {
-          // Silently ignore errors (e.g., when DevTools is not open)
-        });
+        try {
+          chrome.runtime.sendMessage({
+            type: event.data.type,
+            data: event.data.data,
+            url: window.location.href,
+            frameId: window === window.top ? 0 : -1 // Simple frame detection
+          }).catch(() => {
+            // Silently ignore errors (e.g., when DevTools is not open or context invalidated)
+          });
+        } catch (e) {
+          // Extension context invalidated during send - ignore silently
+        }
       }
     });
   }
@@ -70,6 +102,11 @@
    * Initialize the content script
    */
   async function initialize() {
+    // Check if extension context is valid before initialization
+    if (!isExtensionContextValid()) {
+      return;
+    }
+
     try {
       // Retrieve the configured object name from storage
       const result = await chrome.storage.sync.get({
@@ -85,7 +122,11 @@
       injectPageScript(observedObjectName);
 
     } catch (error) {
-      console.error('[DataLayer Debugger Content Script] Initialization error:', error);
+      // Extension context may have been invalidated during async operation
+      // Only log if context is still valid
+      if (isExtensionContextValid()) {
+        console.error('[DataLayer Debugger Content Script] Initialization error:', error);
+      }
     }
   }
 
