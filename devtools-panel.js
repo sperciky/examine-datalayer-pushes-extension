@@ -318,15 +318,31 @@ console.log('[DevTools Panel] Script starting to load...');
 
         try {
           // Create a clickable link in the console that navigates to exact position
-          // by creating a fake error with the exact location in the stack trace
-          const escapedUrl = parsed.url.replace(/'/g, "\\'");
+          // Chrome DevTools makes URLs in console.log clickable if they include line:column
+          const fullLocation = `${parsed.url}:${parsed.line}:${parsed.column}`;
+          const escapedUrl = parsed.url.replace(/'/g, "\\'").replace(/\n/g, '\\n');
+
           const evalCode = `
             (function() {
-              const fakeError = new Error('📍 Click the line below to navigate to exact position:');
-              // Construct a stack trace with the exact position
-              fakeError.stack = 'Click here to navigate:\\n    at (${escapedUrl}:${parsed.line}:${parsed.column})';
-              console.log('%c[DataLayer Debugger] Navigation Helper', 'color: #1976d2; font-weight: bold; font-size: 12px;');
-              console.log(fakeError);
+              console.group('%c📍 DataLayer Push Source Location', 'color: #1976d2; font-weight: bold; font-size: 13px; padding: 4px 0;');
+              console.log('%cClick the link below to navigate to exact position:', 'color: #666; font-size: 11px;');
+              console.log('%c${fullLocation}', 'color: #0066cc; font-size: 12px; text-decoration: underline; cursor: pointer;');
+
+              // Also create a clickable error stack trace as backup
+              try {
+                // Create a function at runtime that will appear in the stack trace at the exact location
+                const dynFunc = new Function(\`
+                  return (function sourceLocation() {
+                    throw new Error('⬆️ Click stack trace above to navigate');
+                  })();
+                \`);
+                dynFunc();
+              } catch (e) {
+                // Manually construct stack to point to exact location
+                e.stack = 'Error: ⬆️ Click the line below to jump to exact position\\n    at ${escapedUrl}:${parsed.line}:${parsed.column}';
+                console.log(e);
+              }
+              console.groupEnd();
             })();
           `;
 
