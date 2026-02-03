@@ -22,8 +22,13 @@
    */
   function isExtensionContextValid() {
     try {
+      // Check if chrome and chrome.runtime exist
+      if (!chrome || !chrome.runtime) {
+        return false;
+      }
       // Try to access chrome.runtime.id - if context is invalidated, this will throw
-      return chrome.runtime && chrome.runtime.id;
+      const id = chrome.runtime.id;
+      return Boolean(id);
     } catch (e) {
       return false;
     }
@@ -83,14 +88,24 @@
 
         // Forward to background/DevTools via chrome.runtime messaging
         try {
-          chrome.runtime.sendMessage({
+          // Double-check that sendMessage exists
+          if (!chrome.runtime.sendMessage) {
+            return;
+          }
+
+          const promise = chrome.runtime.sendMessage({
             type: event.data.type,
             data: event.data.data,
             url: window.location.href,
             frameId: window === window.top ? 0 : -1 // Simple frame detection
-          }).catch(() => {
-            // Silently ignore errors (e.g., when DevTools is not open or context invalidated)
           });
+
+          // Only attach .catch() if promise was returned
+          if (promise && typeof promise.catch === 'function') {
+            promise.catch(() => {
+              // Silently ignore errors (e.g., when DevTools is not open or context invalidated)
+            });
+          }
         } catch (e) {
           // Extension context invalidated during send - ignore silently
         }
@@ -129,6 +144,26 @@
       }
     }
   }
+
+  // Suppress "Extension context invalidated" errors globally
+  // This prevents console pollution when extension is reloaded
+  window.addEventListener('error', (event) => {
+    if (event.message && event.message.includes('Extension context invalidated')) {
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    }
+  }, true);
+
+  // Also suppress unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason && event.reason.message &&
+        event.reason.message.includes('Extension context invalidated')) {
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    }
+  }, true);
 
   // Run initialization
   initialize();
