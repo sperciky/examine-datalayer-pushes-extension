@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "DataLayer Push Debugger",
+  "version": "1.0.0",
+  "description": "Debug and intercept pushes to configurable global array objects (e.g., dataLayer)",
+
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+
+  "devtools_page": "devtools.html",
+
+  "options_page": "options.html",
+
+  "web_accessible_resources": [
+    {
+      "resources": ["page-script.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

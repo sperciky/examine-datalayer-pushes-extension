@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataLayer Push Debugger</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #f5f5f5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toolbar {
+      background: white;
+      border-bottom: 1px solid #ddd;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-separator {
+      width: 1px;
+      height: 20px;
+      background: #ddd;
+      margin: 0 4px;
+    }
+
+    button {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: #f5f5f5;
+      border-color: #bbb;
+    }
+
+    button:active {
+      background: #e8e8e8;
+    }
+
+    .filter-input {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      width: 200px;
+    }
+
+    .filter-input:focus {
+      outline: none;
+      border-color: #1a73e8;
+    }
+
+    .badge {
+      background: #e8eaed;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #555;
+    }
+
+    .content {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+
+    .empty-state h3 {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      font-size: 13px;
+      color: #999;
+    }
+
+    .log-entry {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+
+    .log-entry:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .log-entry.pre-hook {
+      border-left: 4px solid #ff9800;
+    }
+
+    .log-entry.regular {
+      border-left: 4px solid #4caf50;
+    }
+
+    .log-header {
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      background: #fafafa;
+    }
+
+    .log-header:hover {
+      background: #f5f5f5;
+    }
+
+    .log-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .log-header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .expand-icon {
+      font-size: 10px;
+      transition: transform 0.2s;
+      color: #666;
+    }
+
+    .log-entry.expanded .expand-icon {
+      transform: rotate(90deg);
+    }
+
+    .object-name {
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+      color: #1a73e8;
+      font-size: 12px;
+    }
+
+    .event-name {
+      font-family: 'Courier New', monospace;
+      color: #d32f2f;
+      font-size: 12px;
+    }
+
+    .timestamp {
+      color: #999;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .source-info {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+    }
+
+    .pre-hook-badge {
+      background: #fff3cd;
+      color: #856404;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .log-body {
+      padding: 12px;
+      border-top: 1px solid #e0e0e0;
+      display: none;
+    }
+
+    .log-entry.expanded .log-body {
+      display: block;
+    }
+
+    .section {
+      margin-bottom: 16px;
+    }
+
+    .section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .code-block {
+      background: #f8f9fa;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .stack-trace {
+      background: #f8f9fa;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      overflow-x: auto;
+      white-space: pre;
+      max-height: 200px;
+      overflow-y: auto;
+      color: #555;
+    }
+
+    .stack-line {
+      margin: 2px 0;
+    }
+
+    .stack-highlight {
+      color: #d32f2f;
+      font-weight: 600;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 12px;
+      font-size: 12px;
+    }
+
+    .info-label {
+      color: #666;
+      font-weight: 500;
+    }
+
+    .info-value {
+      font-family: 'Courier New', monospace;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button id="clearButton" title="Clear all logs">Clear</button>
+      <span class="badge" id="logCount">0 events</span>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-group">
+      <label for="filterInput" style="font-size: 12px; color: #666;">Filter:</label>
+      <input
+        type="text"
+        id="filterInput"
+        class="filter-input"
+        placeholder="Event name..."
+        autocomplete="off"
+      />
+    </div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-state-icon">📊</div>
+      <h3>No DataLayer Events Yet</h3>
+      <p>Push events will appear here as they occur on the page.</p>
+    </div>
+  </div>
+
+  <script src="devtools-panel.js"></script>
+</body>
+</html>
